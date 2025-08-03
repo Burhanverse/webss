@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import asyncio
 from httpx import AsyncClient
 import os
@@ -12,14 +13,7 @@ from main import app
 # Test configuration
 TEST_URL = "https://httpbin.org/html"
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     """Create test client"""
     async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -28,6 +22,8 @@ async def client():
 class TestScreenshotAPI:
     """Test cases for the screenshot API"""
     
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_health_check(self, client):
         """Test health check endpoint"""
         response = await client.get("/")
@@ -36,6 +32,8 @@ class TestScreenshotAPI:
         assert data["status"] == "healthy"
         assert "WebSS" in data["service"]
     
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_detailed_health_check(self, client):
         """Test detailed health check endpoint"""
         response = await client.get("/health")
@@ -44,6 +42,8 @@ class TestScreenshotAPI:
         assert "status" in data
         assert "browser" in data
     
+    @pytest.mark.asyncio
+    @pytest.mark.asyncio
     async def test_single_screenshot_basic(self, client):
         """Test basic screenshot capture"""
         payload = {
@@ -66,6 +66,7 @@ class TestScreenshotAPI:
         assert data["data"] is not None
         assert len(data["data"]) > 0
     
+    @pytest.mark.asyncio
     async def test_single_screenshot_binary(self, client):
         """Test binary screenshot output"""
         payload = {
@@ -81,6 +82,7 @@ class TestScreenshotAPI:
         assert response.headers["content-type"] == "image/png"
         assert len(response.content) > 0
     
+    @pytest.mark.asyncio
     async def test_single_screenshot_jpeg_quality(self, client):
         """Test JPEG screenshot with quality setting"""
         payload = {
@@ -99,6 +101,7 @@ class TestScreenshotAPI:
         assert data["success"] is True
         assert data["format"] == "jpeg"
     
+    @pytest.mark.asyncio
     async def test_single_screenshot_full_page(self, client):
         """Test full page screenshot"""
         payload = {
@@ -118,6 +121,7 @@ class TestScreenshotAPI:
         # Full page screenshots are typically taller
         assert data["size"]["height"] >= 800
     
+    @pytest.mark.asyncio
     async def test_single_screenshot_mobile(self, client):
         """Test mobile viewport screenshot"""
         payload = {
@@ -135,6 +139,7 @@ class TestScreenshotAPI:
         data = response.json()
         assert data["success"] is True
     
+    @pytest.mark.asyncio
     async def test_single_screenshot_with_delay(self, client):
         """Test screenshot with delay"""
         payload = {
@@ -152,6 +157,7 @@ class TestScreenshotAPI:
         data = response.json()
         assert data["success"] is True
     
+    @pytest.mark.asyncio
     async def test_invalid_url(self, client):
         """Test screenshot with invalid URL"""
         payload = {
@@ -164,6 +170,7 @@ class TestScreenshotAPI:
         response = await client.post("/screenshot", json=payload)
         assert response.status_code == 422  # Validation error
     
+    @pytest.mark.asyncio
     async def test_invalid_dimensions(self, client):
         """Test screenshot with invalid dimensions"""
         payload = {
@@ -176,6 +183,7 @@ class TestScreenshotAPI:
         response = await client.post("/screenshot", json=payload)
         assert response.status_code == 422  # Validation error
     
+    @pytest.mark.asyncio
     async def test_invalid_format(self, client):
         """Test screenshot with invalid format"""
         payload = {
@@ -188,6 +196,7 @@ class TestScreenshotAPI:
         response = await client.post("/screenshot", json=payload)
         assert response.status_code == 422  # Validation error
     
+    @pytest.mark.asyncio
     async def test_quality_without_jpeg(self, client):
         """Test quality parameter with non-JPEG format"""
         payload = {
@@ -204,6 +213,7 @@ class TestScreenshotAPI:
 class TestScreenshotValidation:
     """Test input validation"""
     
+    @pytest.mark.asyncio
     async def test_url_validation(self, client):
         """Test URL validation"""
         test_cases = [
@@ -227,6 +237,7 @@ class TestScreenshotValidation:
             else:
                 assert response.status_code == 422
     
+    @pytest.mark.asyncio
     async def test_dimension_validation(self, client):
         """Test dimension validation"""
         test_cases = [

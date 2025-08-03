@@ -7,7 +7,7 @@ import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl, Field, validator
+from pydantic import BaseModel, HttpUrl, Field, field_validator
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from asyncio_throttle import Throttler
 from datetime import datetime
@@ -35,7 +35,7 @@ class ScreenshotRequest(BaseModel):
     url: HttpUrl
     width: int = Field(default=1920, ge=320, le=3840, description="Viewport width")
     height: int = Field(default=1080, ge=240, le=2160, description="Viewport height")
-    format: str = Field(default="png", regex="^(png|jpeg|webp)$", description="Image format")
+    format: str = Field(default="png", pattern="^(png|jpeg|webp)$", description="Image format")
     quality: Optional[int] = Field(default=None, ge=1, le=100, description="JPEG quality (1-100)")
     full_page: bool = Field(default=False, description="Capture full page")
     delay: int = Field(default=0, ge=0, le=30000, description="Wait time in milliseconds")
@@ -47,11 +47,12 @@ class ScreenshotRequest(BaseModel):
     mobile: bool = Field(default=False, description="Use mobile viewport")
     disable_animations: bool = Field(default=True, description="Disable CSS animations")
     block_ads: bool = Field(default=True, description="Block ads and tracking")
-    output_format: str = Field(default="base64", regex="^(base64|binary)$", description="Output format")
+    output_format: str = Field(default="base64", pattern="^(base64|binary)$", description="Output format")
 
-    @validator('quality')
-    def validate_quality(cls, v, values):
-        if v is not None and values.get('format') != 'jpeg':
+    @field_validator('quality')
+    @classmethod
+    def validate_quality(cls, v, info):
+        if v is not None and info.data.get('format') != 'jpeg':
             raise ValueError('Quality parameter only applies to JPEG format')
         return v
 
