@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+waitress
+playwright
+pydantic
+asyncio-throttle
+Pillow
+structlog
+pydantic-settings
+pytest
+pytest-asyncio
+httpx
+aiohttp
