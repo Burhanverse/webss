@@ -73,7 +73,7 @@ class ScreenshotResponse(BaseModel):
 app = FastAPI(
     title="WebSS - Website Screenshot API",
     description="A robust Python API for capturing website screenshots using Playwright",
-    version="1.0.2"
+    version="1.0.3"
 )
 
 # CORS middleware
@@ -404,7 +404,7 @@ async def root():
     """Health check endpoint"""
     return {
         "service": "WebSS - Website Screenshot API",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
@@ -489,7 +489,7 @@ async def health_check():
             "status": "healthy",
             "browser": browser_status,
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0.2"
+            "version": "1.0.3"
         }
     except Exception as e:
         return {

@@ -4,7 +4,7 @@ from typing import List
 class Settings(BaseSettings):
     # API Configuration
     api_title: str = "WebSS - Website Screenshot API"
-    api_version: str = "1.0.2"
+    api_version: str = "1.0.3"
     api_description: str = "A robust Python API for capturing website screenshots using Playwright"
     
     # Server Configuration
