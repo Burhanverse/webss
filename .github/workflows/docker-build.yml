@@ -33,31 +33,45 @@ jobs:
       id: release_notes
       run: |
         API_VERSION=$(grep -o 'api_version: str = "[^"]*"' src/config.py | grep -o '"[^"]*"' | tr -d '"')
+        echo "Extracting release notes for version: $API_VERSION"
         
-        # Extract the section for this version using awk
-        RELEASE_NOTES=$(awk -v version="## Version $API_VERSION" '
-        BEGIN { found=0; content="" }
-        /^## Version/ {
-          if (found) exit
-          if ($0 ~ version) { found=1; next }
-          else { found=0 }
-        }
-        found && /^## / && !/^### / { exit }
-        found { 
-          if (content) content = content "\n" $0
-          else content = $0
-        }
-        END { 
-          # Remove trailing ---
-          gsub(/\n---$/, "", content)
-          gsub(/%/, "%25", content)
-          gsub(/\n/, "%0A", content) 
-          gsub(/\r/, "%0D", content)
-          print content
-        }' RELEASE_NOTES.md)
+        # Use sed to extract the section between version headers
+        RELEASE_NOTES=$(sed -n "/^## Version $API_VERSION/,/^## Version /p" RELEASE_NOTES.md | sed '$d' | tail -n +2 | sed 's/---$//' | sed '/^$/N;/^\n$/d')
         
+        # If empty, try alternative extraction
         if [ -z "$RELEASE_NOTES" ]; then
-          RELEASE_NOTES="No release notes found for this version."
+          echo "First attempt failed, trying alternative extraction..."
+          RELEASE_NOTES=$(awk -v version="$API_VERSION" '
+            BEGIN { capture=0; content="" }
+            /^## Version/ {
+              if ($0 ~ version) {
+                capture=1
+                next
+              } else if (capture) {
+                exit
+              }
+            }
+            capture && !/^---$/ {
+              if (content == "") {
+                content = $0
+              } else {
+                content = content "\n" $0
+              }
+            }
+            END { print content }
+          ' RELEASE_NOTES.md)
+        fi
+        
+        # Clean up and escape for GitHub Actions
+        if [ -n "$RELEASE_NOTES" ]; then
+          # Remove trailing whitespace and newlines
+          RELEASE_NOTES=$(echo "$RELEASE_NOTES" | sed 's/[[:space:]]*$//')
+          # Escape for GitHub Actions
+          RELEASE_NOTES="${RELEASE_NOTES//'%'/'%25'}"
+          RELEASE_NOTES="${RELEASE_NOTES//$'\n'/'%0A'}"
+          RELEASE_NOTES="${RELEASE_NOTES//$'\r'/'%0D'}"
+        else
+          RELEASE_NOTES="No release notes found for version $API_VERSION."
         fi
         
         echo "RELEASE_NOTES=$RELEASE_NOTES" >> $GITHUB_OUTPUT
@@ -97,6 +111,7 @@ jobs:
         no-cache: true
 
     - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.version.outputs.API_VERSION }}

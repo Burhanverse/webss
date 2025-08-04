@@ -109,7 +109,22 @@ class ScreenshotService:
                     '--disable-gpu',
                     '--disable-background-timer-throttling',
                     '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
+                    '--disable-renderer-backgrounding',
+                    '--disable-web-security',
+                    '--disable-features=TranslateUI',
+                    '--disable-ipc-flooding-protection',
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-default-browser-check',
+                    '--disable-sync',
+                    '--disable-default-apps',
+                    '--disable-extensions',
+                    '--disable-component-update',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-hang-monitor',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--disable-domain-reliability',
+                    '--disable-component-extensions-with-background-pages'
                 ]
             )
             logger.info("Browser initialized")
@@ -152,6 +167,65 @@ class ScreenshotService:
             await context.route("**/*", self._block_resource_handler)
             
         return context
+    
+    async def _navigate_with_retries(self, page: Page, url: str, timeout: int, context: str = "") -> Any:
+        """Navigate to URL with multiple strategies and retry logic"""
+        wait_strategies = ["networkidle", "domcontentloaded", "load", "commit"]
+        max_retries = 2
+        
+        for attempt in range(max_retries):
+            for strategy in wait_strategies:
+                try:
+                    # Use shorter timeout for retries to fail faster
+                    current_timeout = timeout if attempt == 0 else min(timeout // 2, 15000)
+                    
+                    logger.info(
+                        f"{context}Attempting page load",
+                        url=url,
+                        strategy=strategy,
+                        attempt=attempt + 1,
+                        timeout=current_timeout
+                    )
+                    
+                    response = await page.goto(
+                        url,
+                        timeout=current_timeout,
+                        wait_until=strategy
+                    )
+                    
+                    logger.info(
+                        f"{context}Page loaded successfully",
+                        url=url,
+                        strategy=strategy,
+                        attempt=attempt + 1
+                    )
+                    return response
+                    
+                except Exception as e:
+                    logger.warning(
+                        f"{context}Strategy '{strategy}' failed",
+                        url=url,
+                        strategy=strategy,
+                        attempt=attempt + 1,
+                        error=str(e)
+                    )
+                    
+                    # Short delay between strategy attempts
+                    await asyncio.sleep(1)
+        
+        # Final fallback: try with no wait condition and very short timeout
+        try:
+            logger.info(f"{context}Final fallback: attempting with no wait condition", url=url)
+            response = await page.goto(url, timeout=10000)  # 10 second timeout, no wait condition
+            logger.info(f"{context}Final fallback succeeded", url=url)
+            return response
+        except Exception as e:
+            logger.error(
+                f"{context}All navigation attempts failed including final fallback",
+                url=url,
+                error=str(e)
+            )
+            raise e
     
     async def _block_resource_handler(self, route, request):
         """Block ads, trackers, and unnecessary resources"""
@@ -208,25 +282,13 @@ class ScreenshotService:
                         }
                     """)
                 
-                # Navigate to URL with fallback strategy
-                try:
-                    response = await page.goto(
-                        str(request.url),
-                        timeout=request.timeout,
-                        wait_until="networkidle"
-                    )
-                except Exception as e:
-                    # Fallback to domcontentloaded if networkidle fails
-                    logger.warning(
-                        "Networkidle failed, falling back to domcontentloaded",
-                        url=str(request.url),
-                        error=str(e)
-                    )
-                    response = await page.goto(
-                        str(request.url),
-                        timeout=request.timeout,
-                        wait_until="domcontentloaded"
-                    )
+                # Navigate to URL with multiple fallback strategies and retries
+                response = await self._navigate_with_retries(
+                    page, 
+                    str(request.url), 
+                    request.timeout,
+                    ""
+                )
                 
                 if not response or response.status >= 400:
                     raise HTTPException(
@@ -373,16 +435,13 @@ async def capture_screenshot(request: ScreenshotRequest):
                         }
                     """)
                 
-                # Navigate with fallback strategy
-                try:
-                    await page.goto(str(request.url), timeout=request.timeout, wait_until="networkidle")
-                except Exception as e:
-                    logger.warning(
-                        "Networkidle failed in binary mode, falling back to domcontentloaded",
-                        url=str(request.url),
-                        error=str(e)
-                    )
-                    await page.goto(str(request.url), timeout=request.timeout, wait_until="domcontentloaded")
+                # Navigate with multiple fallback strategies and retries
+                response = await screenshot_service._navigate_with_retries(
+                    page,
+                    str(request.url),
+                    request.timeout,
+                    "Binary mode: "
+                )
                 
                 # Apply delay - use either user-specified delay or default minimum delay
                 # This ensures heavy sites like YouTube have time to fully load
