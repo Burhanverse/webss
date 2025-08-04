@@ -23,71 +23,44 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
     - name: Extract API version from config.py
       id: version
       run: |
-        python -c "
-        import sys
-        sys.path.append('src')
-        from config import Settings
-        settings = Settings()
-        print(f'API_VERSION={settings.api_version}')
-        " >> $GITHUB_OUTPUT
+        API_VERSION=$(grep -o 'api_version: str = "[^"]*"' src/config.py | grep -o '"[^"]*"' | tr -d '"')
+        echo "API_VERSION=$API_VERSION" >> $GITHUB_OUTPUT
 
     - name: Extract release notes from RELEASE_NOTES.md
       id: release_notes
       run: |
-        python -c "
-        import sys
-        sys.path.append('src')
-        from config import Settings
-        settings = Settings()
-        version = settings.api_version
+        API_VERSION=$(grep -o 'api_version: str = "[^"]*"' src/config.py | grep -o '"[^"]*"' | tr -d '"')
         
-        # Read RELEASE_NOTES.md
-        with open('RELEASE_NOTES.md', 'r') as f:
-            content = f.read()
+        # Extract the section for this version using awk
+        RELEASE_NOTES=$(awk -v version="## Version $API_VERSION" '
+        BEGIN { found=0; content="" }
+        /^## Version/ {
+          if (found) exit
+          if ($0 ~ version) { found=1; next }
+          else { found=0 }
+        }
+        found && /^## / && !/^### / { exit }
+        found { 
+          if (content) content = content "\n" $0
+          else content = $0
+        }
+        END { 
+          # Remove trailing ---
+          gsub(/\n---$/, "", content)
+          gsub(/%/, "%25", content)
+          gsub(/\n/, "%0A", content) 
+          gsub(/\r/, "%0D", content)
+          print content
+        }' RELEASE_NOTES.md)
         
-        # Find the section for this version
-        lines = content.split('\n')
-        start_idx = None
-        end_idx = None
+        if [ -z "$RELEASE_NOTES" ]; then
+          RELEASE_NOTES="No release notes found for this version."
+        fi
         
-        # Look for version header
-        version_header = f'## Version {version}'
-        for i, line in enumerate(lines):
-            if line.startswith(version_header):
-                start_idx = i
-                break
-        
-        if start_idx is not None:
-            # Find the end of this version's section (next ## or end of file)
-            for i in range(start_idx + 1, len(lines)):
-                if lines[i].startswith('## ') and not lines[i].startswith('### '):
-                    end_idx = i
-                    break
-            
-            if end_idx is None:
-                end_idx = len(lines)
-            
-            # Extract the version section (skip the version header)
-            version_notes = '\n'.join(lines[start_idx + 1:end_idx]).strip()
-            
-            # Remove the horizontal rule if present
-            if version_notes.endswith('---'):
-                version_notes = version_notes[:-3].strip()
-            
-            # Escape for GitHub Actions
-            version_notes = version_notes.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
-            print(f'RELEASE_NOTES={version_notes}')
-        else:
-            print('RELEASE_NOTES=No release notes found for this version.')
-        " >> $GITHUB_OUTPUT
+        echo "RELEASE_NOTES=$RELEASE_NOTES" >> $GITHUB_OUTPUT
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -98,7 +71,7 @@ jobs:
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
-        password: ${{ secrets.PAT }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Extract metadata
       id: meta
