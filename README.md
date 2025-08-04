@@ -25,7 +25,7 @@ A Python API for capturing website screenshots using Playwright. Built with Fast
 - **Cookie Management**: Set cookies for authenticated sessions
 - **JavaScript Control**: Configurable JavaScript execution
 - **Animation Disabling**: Speed up captures by disabling CSS animations
-- **Network Timing**: Wait for network idle or custom delays
+- **Network Timing**: Wait for network idle or custom delays with automatic 5-second minimum for heavy sites
 
 ### Performance & Security
 - **Built-in Ad Blocking**: Block ads, trackers, and unnecessary resources
@@ -171,7 +171,7 @@ POST /screenshot
 | `format` | string | "png" | png, jpeg, webp | Output image format |
 | `quality` | integer | null | 1-100 | JPEG/WebP quality (JPEG only) |
 | `full_page` | boolean | false | - | Capture full scrollable content |
-| `delay` | integer | 0 | 0-30000 | Wait time in milliseconds before capture |
+| `delay` | integer | 0 | 0-30000 | Wait time in milliseconds before capture (minimum 5000ms applied for heavy sites) |
 | `timeout` | integer | 30000 | 5000-120000 | Page load timeout in milliseconds |
 | `user_agent` | string | null | - | Custom User-Agent header |
 | `headers` | object | null | - | Custom HTTP headers |
@@ -265,6 +265,7 @@ DEFAULT_HEIGHT=1080
 DEFAULT_FORMAT=png
 MAX_SCREENSHOT_WIDTH=3840
 MAX_SCREENSHOT_HEIGHT=2160
+DEFAULT_DELAY=5000
 
 # Rate Limiting
 RATE_LIMIT_REQUESTS=10

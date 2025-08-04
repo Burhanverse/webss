@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     default_format: str = "png"
     max_screenshot_width: int = 3840
     max_screenshot_height: int = 2160
+    default_delay: int = 5000  # Default 5 second delay for heavy sites
     
     # Rate Limiting
     rate_limit_requests: int = 10

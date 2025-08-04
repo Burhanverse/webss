@@ -12,6 +12,7 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from asyncio_throttle import Throttler
 from datetime import datetime
 from PIL import Image
+from config import Settings
 
 # Configure structured logging
 structlog.configure(
@@ -30,6 +31,9 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
+# Initialize settings
+settings = Settings()
+
 # Pydantic models
 class ScreenshotRequest(BaseModel):
     url: HttpUrl
@@ -38,7 +42,7 @@ class ScreenshotRequest(BaseModel):
     format: str = Field(default="png", pattern="^(png|jpeg|webp)$", description="Image format")
     quality: Optional[int] = Field(default=None, ge=1, le=100, description="JPEG quality (1-100)")
     full_page: bool = Field(default=False, description="Capture full page")
-    delay: int = Field(default=0, ge=0, le=30000, description="Wait time in milliseconds")
+    delay: int = Field(default=0, ge=0, le=30000, description="Wait time in milliseconds (minimum 2000ms applied for heavy sites)")
     timeout: int = Field(default=30000, ge=5000, le=120000, description="Page load timeout")
     user_agent: Optional[str] = Field(default=None, description="Custom user agent")
     headers: Optional[Dict[str, str]] = Field(default=None, description="Custom headers")
@@ -209,9 +213,18 @@ class ScreenshotService:
                         detail=f"Failed to load URL: {response.status if response else 'No response'}"
                     )
                 
-                # Wait additional delay if specified
-                if request.delay > 0:
-                    await page.wait_for_timeout(request.delay)
+                # Apply delay - use either user-specified delay or default minimum delay
+                # This ensures heavy sites like YouTube have time to fully load
+                effective_delay = max(request.delay, settings.default_delay)
+                if effective_delay > 0:
+                    logger.info(
+                        "Applying delay before screenshot",
+                        url=str(request.url),
+                        delay=effective_delay,
+                        user_delay=request.delay,
+                        default_delay=settings.default_delay
+                    )
+                    await page.wait_for_timeout(effective_delay)
                 
                 # Prepare screenshot options
                 screenshot_options = {
@@ -341,8 +354,11 @@ async def capture_screenshot(request: ScreenshotRequest):
                 
                 await page.goto(str(request.url), timeout=request.timeout, wait_until="networkidle")
                 
-                if request.delay > 0:
-                    await page.wait_for_timeout(request.delay)
+                # Apply delay - use either user-specified delay or default minimum delay
+                # This ensures heavy sites like YouTube have time to fully load
+                effective_delay = max(request.delay, settings.default_delay)
+                if effective_delay > 0:
+                    await page.wait_for_timeout(effective_delay)
                 
                 screenshot_options = {"type": request.format, "full_page": request.full_page}
                 if request.format == "jpeg" and request.quality:

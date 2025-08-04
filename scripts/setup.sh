@@ -60,6 +60,9 @@ RATE_LIMIT_PERIOD=1
 # Browser Configuration
 BROWSER_HEADLESS=true
 MAX_CONCURRENT_BROWSERS=5
+
+# Screenshot Configuration
+DEFAULT_DELAY=5000
 EOL
 fi
 
