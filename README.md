@@ -230,6 +230,19 @@ print(result)
 
 ### Docker Deployment
 
+#### Using Pre-built Image from GitHub Container Registry
+
+```bash
+# Pull and run the latest image
+docker run -p 8000:8000 ghcr.io/burhanverse/webss:latest
+
+# Or with docker-compose, update your docker-compose.yml:
+# image: ghcr.io/burhanverse/webss:latest
+docker-compose up -d
+```
+
+#### Building Locally
+
 ```bash
 # Build and run with Docker Compose
 docker-compose up -d
@@ -238,6 +251,16 @@ docker-compose up -d
 docker build -t webss .
 docker run -p 8000:8000 webss
 ```
+
+#### Available Tags
+
+- `latest`: Latest stable release from main branch
+- `main`: Latest commit from main branch  
+- `v*.*.*`: Specific version releases
+
+### Automated Builds
+
+This project uses GitHub Actions to automatically build and publish Docker images to GitHub Container Registry (GHCR) on every push to the main branch and on new releases. The images are publicly available and support both `linux/amd64` and `linux/arm64` architectures.
 
 ### Manual Deployment
 
