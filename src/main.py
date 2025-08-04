@@ -73,7 +73,7 @@ class ScreenshotResponse(BaseModel):
 app = FastAPI(
     title="WebSS - Website Screenshot API",
     description="A robust Python API for capturing website screenshots using Playwright",
-    version="1.0.0"
+    version="1.0.2"
 )
 
 # CORS middleware
@@ -157,10 +157,13 @@ class ScreenshotService:
         """Block ads, trackers, and unnecessary resources"""
         blocked_domains = {
             'googletagmanager.com', 'google-analytics.com', 'googlesyndication.com',
-            'doubleclick.net', 'facebook.com', 'twitter.com', 'linkedin.com',
-            'outbrain.com', 'taboola.com', 'amazon-adsystem.com'
+            'doubleclick.net', 'outbrain.com', 'taboola.com', 'amazon-adsystem.com',
+            'scorecardresearch.com', 'quantserve.com', 'chartbeat.com', 'parsely.com',
+            'krxd.net', 'adsystem.com', 'ads.yahoo.com', 'advertising.com',
+            'bing.com/maps', 'hotjar.com', 'fullstory.com', 'mouseflow.com'
         }
         
+        # More aggressive blocking for better performance
         blocked_types = {'font', 'media', 'other'}
         
         url = request.url
@@ -171,8 +174,13 @@ class ScreenshotService:
             await route.abort()
             return
             
-        # Block certain resource types
+        # Block certain resource types for faster loading
         if resource_type in blocked_types:
+            await route.abort()
+            return
+            
+        # Block specific problematic patterns
+        if any(pattern in url.lower() for pattern in ['analytics', 'tracking', 'advertisement', 'doubleclick']):
             await route.abort()
             return
             
@@ -200,12 +208,25 @@ class ScreenshotService:
                         }
                     """)
                 
-                # Navigate to URL
-                response = await page.goto(
-                    str(request.url),
-                    timeout=request.timeout,
-                    wait_until="networkidle"
-                )
+                # Navigate to URL with fallback strategy
+                try:
+                    response = await page.goto(
+                        str(request.url),
+                        timeout=request.timeout,
+                        wait_until="networkidle"
+                    )
+                except Exception as e:
+                    # Fallback to domcontentloaded if networkidle fails
+                    logger.warning(
+                        "Networkidle failed, falling back to domcontentloaded",
+                        url=str(request.url),
+                        error=str(e)
+                    )
+                    response = await page.goto(
+                        str(request.url),
+                        timeout=request.timeout,
+                        wait_until="domcontentloaded"
+                    )
                 
                 if not response or response.status >= 400:
                     raise HTTPException(
@@ -321,7 +342,7 @@ async def root():
     """Health check endpoint"""
     return {
         "service": "WebSS - Website Screenshot API",
-        "version": "1.0.0",
+        "version": "1.0.2",
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
@@ -352,7 +373,16 @@ async def capture_screenshot(request: ScreenshotRequest):
                         }
                     """)
                 
-                await page.goto(str(request.url), timeout=request.timeout, wait_until="networkidle")
+                # Navigate with fallback strategy
+                try:
+                    await page.goto(str(request.url), timeout=request.timeout, wait_until="networkidle")
+                except Exception as e:
+                    logger.warning(
+                        "Networkidle failed in binary mode, falling back to domcontentloaded",
+                        url=str(request.url),
+                        error=str(e)
+                    )
+                    await page.goto(str(request.url), timeout=request.timeout, wait_until="domcontentloaded")
                 
                 # Apply delay - use either user-specified delay or default minimum delay
                 # This ensures heavy sites like YouTube have time to fully load
@@ -400,7 +430,7 @@ async def health_check():
             "status": "healthy",
             "browser": browser_status,
             "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0"
+            "version": "1.0.2"
         }
     except Exception as e:
         return {
