@@ -23,6 +23,72 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Extract API version from config.py
+      id: version
+      run: |
+        python -c "
+        import sys
+        sys.path.append('src')
+        from config import Settings
+        settings = Settings()
+        print(f'API_VERSION={settings.api_version}')
+        " >> $GITHUB_OUTPUT
+
+    - name: Extract release notes from RELEASE_NOTES.md
+      id: release_notes
+      run: |
+        python -c "
+        import sys
+        sys.path.append('src')
+        from config import Settings
+        settings = Settings()
+        version = settings.api_version
+        
+        # Read RELEASE_NOTES.md
+        with open('RELEASE_NOTES.md', 'r') as f:
+            content = f.read()
+        
+        # Find the section for this version
+        lines = content.split('\n')
+        start_idx = None
+        end_idx = None
+        
+        # Look for version header
+        version_header = f'## Version {version}'
+        for i, line in enumerate(lines):
+            if line.startswith(version_header):
+                start_idx = i
+                break
+        
+        if start_idx is not None:
+            # Find the end of this version's section (next ## or end of file)
+            for i in range(start_idx + 1, len(lines)):
+                if lines[i].startswith('## ') and not lines[i].startswith('### '):
+                    end_idx = i
+                    break
+            
+            if end_idx is None:
+                end_idx = len(lines)
+            
+            # Extract the version section (skip the version header)
+            version_notes = '\n'.join(lines[start_idx + 1:end_idx]).strip()
+            
+            # Remove the horizontal rule if present
+            if version_notes.endswith('---'):
+                version_notes = version_notes[:-3].strip()
+            
+            # Escape for GitHub Actions
+            version_notes = version_notes.replace('%', '%25').replace('\n', '%0A').replace('\r', '%0D')
+            print(f'RELEASE_NOTES={version_notes}')
+        else:
+            print('RELEASE_NOTES=No release notes found for this version.')
+        " >> $GITHUB_OUTPUT
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -45,6 +111,7 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value=v${{ steps.version.outputs.API_VERSION }},enable={{is_default_branch}}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -55,3 +122,28 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         no-cache: true
+
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.version.outputs.API_VERSION }}
+        name: WebSS API v${{ steps.version.outputs.API_VERSION }}
+        body: |
+          ${{ steps.release_notes.outputs.RELEASE_NOTES }}
+          
+          ---
+          
+          ### Docker Images
+          - `ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.API_VERSION }}`
+          - `ghcr.io/${{ github.repository }}:latest`
+          
+          ### Installation
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:v${{ steps.version.outputs.API_VERSION }}
+          ```
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

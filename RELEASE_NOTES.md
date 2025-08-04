@@ -1,5 +1,30 @@
 # WebSS Release Notes
 
+## Version 1.0.2 - Enhanced Performance & Reliability
+*Released: August 4, 2025*
+
+🚀 **Improved performance and reliability for heavy websites with enhanced blocking and fallback strategies**
+
+### 🆕 New Features
+- **Facebook Domain Unblocked**: Removed Facebook from blocked domains to allow proper loading of Facebook widgets and social media content
+- **Enhanced Ad/Tracker Blocking**: Added comprehensive blocking for analytics and tracking domains including:
+  - `scorecardresearch.com`, `quantserve.com`, `chartbeat.com`, `parsely.com`
+  - `krxd.net`, `adsystem.com`, `ads.yahoo.com`, `advertising.com`
+  - `hotjar.com`, `fullstory.com`, `mouseflow.com`
+- **Pattern-Based Blocking**: Added intelligent blocking for URLs containing 'analytics', 'tracking', 'advertisement', 'doubleclick'
+
+### 🔧 Technical Improvements
+- **Fallback Navigation Strategy**: Implemented robust timeout handling with automatic fallback from `networkidle` to `domcontentloaded` when pages timeout
+- **Enhanced Error Handling**: Better logging and recovery for slow-loading websites like The Verge
+- **Improved Blocking Performance**: More aggressive resource blocking for faster page loading
+- **Dual Navigation Modes**: Applied fallback strategy to both base64 and binary screenshot endpoints
+
+### 🐛 Bug Fixes
+- **Timeout Resolution**: Fixed timeout issues with heavy websites that previously failed to load within 30 seconds
+- **Facebook Content Loading**: Facebook widgets, login buttons, and social media elements now load correctly in screenshots
+
+---
+
 ## Version 1.0.1 - Heavy Site Optimization
 *Released: August 4, 2025*
 
