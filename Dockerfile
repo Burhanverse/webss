@@ -4,6 +4,8 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 # Install system dependencies including Playwright requirements
 RUN apt-get update && apt-get install -y \
@@ -44,14 +46,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers and system dependencies (as root)
+# Install Playwright browsers in a global location
 RUN playwright install chromium --with-deps
+
+# Verify browser installation
+RUN playwright list && \
+    ls -la /ms-playwright/ || echo "Browser path check"
 
 # Copy application code
 COPY src/ ./src/
 
-# Set permissions
-RUN chown -R appuser:appuser /app
+# Set permissions for the global playwright directory and app
+RUN chmod -R 755 /ms-playwright && \
+    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
