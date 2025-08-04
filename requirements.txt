@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-waitress
 playwright
 pydantic
 asyncio-throttle
