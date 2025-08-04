@@ -1,5 +1,42 @@
 # WebSS Release Notes
 
+## Version 1.0.3 - Advanced Navigation & Browser Detection Improvements
+*Released: August 5, 2025*
+
+🚀 **Enhanced navigation reliability with multi-strategy retry logic and improved bot detection evasion**
+
+### 🆕 New Features
+- **Multi-Strategy Navigation System**: Implemented robust page loading with 4 different wait strategies:
+  - `networkidle` - Wait for network activity to cease
+  - `domcontentloaded` - Wait for DOM to be fully loaded
+  - `load` - Wait for all resources to load
+  - `commit` - Wait for navigation to commit
+- **Ultimate Fallback Navigation**: Added final fallback attempt with no wait conditions and 10-second timeout for extremely problematic sites
+- **Enhanced Bot Detection Evasion**: Added advanced browser arguments to bypass detection:
+  - `--disable-blink-features=AutomationControlled` - Hide automation indicators
+  - `--disable-component-update` - Prevent component updates that may reveal automation
+  - `--disable-component-extensions-with-background-pages` - Disable background extensions
+  - Additional stealth mode improvements
+
+### 🔧 Technical Improvements
+- **Intelligent Timeout Management**: Dynamic timeout adjustment for retry attempts (50% reduction on retries)
+- **Enhanced Retry Logic**: Up to 2 retry attempts with 4 strategies each (8 total attempts before final fallback)
+- **Comprehensive Navigation Logging**: Detailed logging for each navigation attempt with strategy, attempt number, and timeout information
+- **Improved Error Recovery**: Better handling of navigation failures with graceful degradation
+- **Updated API Documentation**: Refined delay parameter description to reflect current behavior
+
+### 🐛 Bug Fixes
+- **Navigation Timeout Resolution**: Significantly improved success rate for sites that previously failed to load
+- **Heavy Site Compatibility**: Better handling of resource-intensive websites with multiple fallback strategies
+- **Error Messaging**: More informative error messages when all navigation attempts fail
+
+### 📈 Performance Improvements
+- **Faster Failure Detection**: Reduced timeout on retry attempts for quicker failover
+- **Optimized Loading Strategies**: Prioritized loading strategies for better success rates
+- **Resource Management**: Improved cleanup and error handling for failed navigation attempts
+
+---
+
 ## Version 1.0.2 - Enhanced Performance & Reliability
 *Released: August 4, 2025*
 

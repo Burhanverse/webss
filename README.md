@@ -231,8 +231,8 @@ GET /health                   # Detailed health with browser status
 {
   "status": "healthy",
   "browser": "healthy", 
-  "timestamp": "2025-08-04T14:22:00.000Z",
-  "version": "1.0.0"
+  "timestamp": "2025-08-05T14:22:00.000Z",
+  "version": "1.0.3"
 }
 ```
 
