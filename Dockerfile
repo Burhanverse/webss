@@ -53,11 +53,13 @@ RUN playwright install chromium --with-deps
 RUN playwright list && \
     ls -la /ms-playwright/ || echo "Browser path check"
 
-# Copy application code
+# Copy application code and scripts
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
-# Set permissions for the global playwright directory and app
+# Set permissions for the global playwright directory, app, and scripts
 RUN chmod -R 755 /ms-playwright && \
+    chmod +x ./scripts/healthcheck.sh && \
     chown -R appuser:appuser /app
 
 # Switch to non-root user
@@ -68,7 +70,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD ./scripts/healthcheck.sh
 
 # Run the application
 CMD ["python", "src/server.py"]

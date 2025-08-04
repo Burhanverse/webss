@@ -2,6 +2,13 @@
 
 A robust Python API for capturing website screenshots using Playwright, similar to gowitness but with more features and flexibility.
 
+## 🚀 Live Demo
+
+**Try it now**: [https://webss-latest.onrender.com](https://webss-latest.onrender.com)
+
+- API Documentation: [https://webss-latest.onrender.com/docs](https://webss-latest.onrender.com/docs)
+- Health Check: [https://webss-latest.onrender.com/health](https://webss-latest.onrender.com/health)
+
 ## Features
 
 - **Fast Screenshot Capture**: Powered by Playwright for reliable browser automation
@@ -67,7 +74,19 @@ chmod +x scripts/setup.sh
 ### 3. Test the API
 
 ```bash
-# Using curl
+# Using curl (live demo)
+curl -X POST 'https://webss-latest.onrender.com/screenshot' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "url": "https://example.com",
+    "width": 1920,
+    "height": 1080,
+    "format": "png",
+    "full_page": true,
+    "output_format": "base64"
+  }'
+
+# Local development
 curl -X POST 'http://localhost:8000/screenshot' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -189,7 +208,8 @@ MAX_CONCURRENT_BROWSERS=5
 from src.client import WebSSClient
 
 async def main():
-    async with WebSSClient("http://localhost:8000") as client:
+    # Use live demo or local instance
+    async with WebSSClient("https://webss-latest.onrender.com") as client:
         # Single screenshot (base64)
         result = await client.capture_screenshot(
             url="https://example.com",
@@ -219,7 +239,8 @@ async def main():
 ```python
 from src.client import WebSSClientSync
 
-client = WebSSClientSync("http://localhost:8000")
+# Use live demo or local instance
+client = WebSSClientSync("https://webss-latest.onrender.com")
 
 # Single screenshot
 result = client.capture_screenshot("https://example.com")
@@ -227,6 +248,26 @@ print(result)
 ```
 
 ## Deployment
+
+### Live Demo on Render
+
+The application is deployed and available at:
+- **API Base URL**: https://webss-latest.onrender.com
+- **Interactive Docs**: https://webss-latest.onrender.com/docs
+- **Health Check**: https://webss-latest.onrender.com/health
+
+### Cloud Deployment (Render)
+
+1. **Fork this repository**
+2. **Connect to Render**:
+   - Go to [Render Dashboard](https://render.com)
+   - Create a new Web Service
+   - Connect your GitHub repository
+3. **Configure the service**:
+   - Build Command: `pip install -r requirements.txt && playwright install chromium --with-deps`
+   - Start Command: `python src/server.py`
+   - Health Check Path: `/health`
+4. **Deploy**: Render will automatically deploy your application
 
 ### Docker Deployment
 
@@ -317,10 +358,14 @@ python src/main.py
 ### Health Monitoring
 
 ```bash
-# Check basic health
-curl http://localhost:8000/
+# Check basic health (live demo)
+curl https://webss-latest.onrender.com/
 
-# Check detailed health with browser status
+# Check detailed health with browser status (live demo)
+curl https://webss-latest.onrender.com/health
+
+# Local development
+curl http://localhost:8000/
 curl http://localhost:8000/health
 ```
 
