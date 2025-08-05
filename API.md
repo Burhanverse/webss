@@ -38,6 +38,7 @@ GET /health                   # Detailed health with browser status
 | `cookies` | array | null | - | Browser cookies to set |
 | `disable_animations` | boolean | true | - | Disable CSS animations |
 | `block_ads` | boolean | true | - | Block ads and tracking scripts |
+| `block_images` | boolean | false | - | Block images (not recommended for screenshots) |
 | `output_format` | string | "base64" | base64, binary | Response format |
 
 ### Heavy Site Parameters

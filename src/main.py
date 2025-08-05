@@ -51,6 +51,7 @@ class ScreenshotRequest(BaseModel):
     mobile: bool = Field(default=False, description="Use mobile viewport")
     disable_animations: bool = Field(default=True, description="Disable CSS animations")
     block_ads: bool = Field(default=True, description="Block ads and tracking")
+    block_images: bool = Field(default=False, description="Block images (not recommended for screenshots)")
     output_format: str = Field(default="base64", pattern="^(base64|binary)$", description="Output format")
     wait_for_network_idle: bool = Field(default=True, description="Wait for network to be idle")
     smart_wait: bool = Field(default=True, description="Enable smart waiting for content readiness")
@@ -197,7 +198,7 @@ class ScreenshotService:
             
         # Configure resource blocking based on request
         if request.block_ads:
-            await context.route("**/*", self._smart_resource_handler)
+            await context.route("**/*", lambda route, req: self._smart_resource_handler(route, req, request))
             
         return context
     
@@ -351,15 +352,27 @@ class ScreenshotService:
                     // Check if major frameworks are done
                     if (window.jQuery && window.jQuery.active > 0) return false;
                     
-                    // Look for signs of dynamic content loading
-                    const images = document.querySelectorAll('img[src]');
+                    // Enhanced image loading detection
+                    const allImages = document.querySelectorAll('img');
                     let loadedImages = 0;
-                    images.forEach(img => {{
-                        if (img.complete) loadedImages++;
+                    let totalImages = 0;
+                    
+                    allImages.forEach(img => {{
+                        totalImages++;
+                        // Check multiple conditions for loaded images
+                        if (img.complete && img.naturalHeight !== 0) {{
+                            loadedImages++;
+                        }} else if (img.src && img.src.startsWith('data:')) {{
+                            // Data URLs are immediately available
+                            loadedImages++;
+                        }} else if (!img.src && !img.dataset.src) {{
+                            // Images without src are probably placeholders
+                            loadedImages++;
+                        }}
                     }});
                     
-                    // If more than 80% of images are loaded, consider ready
-                    if (images.length > 0 && loadedImages / images.length < 0.8) return false;
+                    // Be more lenient - if more than 70% of images are loaded or very few images
+                    if (totalImages > 3 && loadedImages / totalImages < 0.7) return false;
                     
                     return true;
                 }}
@@ -373,10 +386,15 @@ class ScreenshotService:
             # Non-critical failure
             logger.info(f"{context}Content readiness check timeout (continuing)", url=url, error=str(e))
     
-    async def _smart_resource_handler(self, route, request):
-        """Smart resource blocking that preserves functionality while improving performance"""
+    async def _smart_resource_handler(self, route, request, screenshot_request):
+        """Enhanced smart resource blocking that preserves images while blocking ads"""
         url = request.url.lower()
         resource_type = request.resource_type
+        
+        # If image blocking is explicitly disabled, allow all images
+        if resource_type in {'image', 'media'} and screenshot_request.block_images == False:
+            await route.continue_()
+            return
         
         # Critical domains to block (ads, analytics, trackers)
         blocked_domains = {
@@ -389,64 +407,108 @@ class ScreenshotService:
             'optimizely.com', 'mixpanel.com', 'segment.com', 'amplitude.com'
         }
         
-        # Block known problematic patterns
+        # More specific ad patterns to avoid blocking legitimate content
         blocked_patterns = [
-            'analytics', 'tracking', 'advertisement', 'ads.', '/ads/', 
-            'doubleclick', 'googlesyndication', 'googleadservices',
+            'googletagmanager', 'google-analytics', 'googlesyndication', 'googleadservices',
+            'doubleclick.net', '/gtm.js', '/analytics.js', '/ga.js',
             'facebook.com/tr', 'twitter.com/i/adsct', 'linkedin.com/li',
-            'tiktok.com/i18n/pixel', 'snapchat.com/p'
+            'tiktok.com/i18n/pixel', 'snapchat.com/p', '/pixel.gif',
+            'outbrain.com', 'taboola.com', 'amazon-adsystem.com'
         ]
         
         # Always block these resource types (non-essential for screenshots)
         always_block_types = {'other'}
         
-        # Conditionally block these (only if they match ad patterns)
-        conditional_block_types = {'font', 'media', 'image'}
+        # NEVER block images - they're essential for screenshots
+        # Only block specific ad tracking resources
+        never_block_types = {'image', 'media', 'font', 'stylesheet', 'script', 'document'}
         
-        # Check for blocked domains
+        # Check for blocked domains first
         if any(domain in url for domain in blocked_domains):
             await route.abort()
             return
             
-        # Check for blocked patterns
+        # Check for specific ad patterns (more precise)
         if any(pattern in url for pattern in blocked_patterns):
             await route.abort()
             return
             
-        # Block always-blocked types
+        # Block only non-essential types
         if resource_type in always_block_types:
             await route.abort()
             return
             
-        # For media/fonts/images, only block if they're from ad-related URLs
-        if resource_type in conditional_block_types:
-            # Allow if it's from the main domain or CDN
+        # Enhanced logic for images and media - be very permissive
+        if resource_type in {'image', 'media'}:
             try:
                 from urllib.parse import urlparse
                 request_domain = urlparse(request.url).netloc
                 page_domain = urlparse(route.request.frame.url).netloc
                 
-                # Allow same domain or common CDNs
-                allowed_domains = {
-                    page_domain,
-                    f"cdn.{page_domain}",
-                    f"static.{page_domain}",
-                    'cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com',
-                    'fonts.googleapis.com', 'fonts.gstatic.com',
-                    'ajax.googleapis.com', 'code.jquery.com'
+                # Known content domains to always allow
+                trusted_image_domains = {
+                    # YouTube domains
+                    'i.ytimg.com', 'yt3.ggpht.com', 'yt3.googleusercontent.com',
+                    # Google domains
+                    'lh3.googleusercontent.com', 'lh4.googleusercontent.com', 'lh5.googleusercontent.com',
+                    # Media CDNs
+                    'media.giphy.com', 'i.imgur.com', 'imgur.com',
+                    # News sites
+                    'cdn.vox-cdn.com', 'duet-cdn.vox-cdn.com', 'chorus-cdn.net',
+                    # Social media
+                    'scontent.fbcdn.net', 'pbs.twimg.com', 'abs.twimg.com',
+                    # Common CDNs
+                    'cloudfront.net', 'fastly.com', 'jsdelivr.net', 'unpkg.com'
                 }
                 
-                if not any(allowed in request_domain for allowed in allowed_domains):
-                    # Block media from unknown domains that might be ads
-                    if any(ad_indicator in url for ad_indicator in ['ad', 'ads', 'banner', 'popup']):
-                        await route.abort()
-                        return
-                        
+                # Always allow images from trusted domains
+                if any(trusted in request_domain for trusted in trusted_image_domains):
+                    await route.continue_()
+                    return
+                
+                # Allow same domain images
+                if request_domain == page_domain or request_domain.endswith(f'.{page_domain}'):
+                    await route.continue_()
+                    return
+                
+                # Only block if URL contains very specific ad indicators
+                explicit_ad_indicators = [
+                    '/ad/', '/ads/', '/banner/', '/popup/', 
+                    'advertisement', 'adnxs.com', 'adsystem.com',
+                    'googlesyndication', 'doubleclick'
+                ]
+                
+                if any(indicator in url for indicator in explicit_ad_indicators):
+                    await route.abort()
+                    return
+                
+                # Default: allow all other images
+                await route.continue_()
+                return
+                
             except Exception:
-                # If parsing fails, allow the request
+                # If parsing fails, allow the request (be permissive)
+                await route.continue_()
+                return
+        
+        # For fonts and stylesheets, be permissive
+        if resource_type in {'font', 'stylesheet'}:
+            # Only block if from known ad domains
+            try:
+                from urllib.parse import urlparse
+                request_domain = urlparse(request.url).netloc
+                
+                if any(blocked_domain in request_domain for blocked_domain in blocked_domains):
+                    await route.abort()
+                    return
+                    
+            except Exception:
                 pass
             
-        # Allow everything else
+            await route.continue_()
+            return
+        
+        # Allow everything else by default (be permissive)
         await route.continue_()
     
     async def capture_screenshot(self, request: ScreenshotRequest) -> ScreenshotResponse:
@@ -663,40 +725,91 @@ class ScreenshotService:
         return min(total_delay, 30000)
     
     async def _final_content_check(self, page: Page, request: ScreenshotRequest):
-        """Final check to ensure content is ready for screenshot"""
+        """Enhanced final check to ensure content is ready for screenshot"""
         
         if not request.smart_wait:
             return
         
         try:
-            # Wait for images to load
+            # Enhanced image loading wait
             await page.wait_for_function("""
                 () => {
                     const images = Array.from(document.images);
-                    return images.length === 0 || images.every(img => img.complete);
+                    if (images.length === 0) return true;
+                    
+                    let loadedCount = 0;
+                    images.forEach(img => {
+                        // More comprehensive image loading check
+                        if (img.complete && img.naturalHeight !== 0) {
+                            loadedCount++;
+                        } else if (img.src && img.src.startsWith('data:')) {
+                            loadedCount++;
+                        } else if (!img.src && !img.dataset.src) {
+                            // Empty images are considered "loaded"
+                            loadedCount++;
+                        }
+                    });
+                    
+                    // Be more lenient - 70% threshold for heavy sites
+                    return loadedCount / images.length >= 0.7;
                 }
-            """, timeout=5000)
+            """, timeout=8000)
             
-            # Check for lazy loading completion
+            # Enhanced lazy loading detection
             await page.wait_for_function("""
                 () => {
-                    // Check for common lazy loading indicators
-                    const lazyElements = document.querySelectorAll(
-                        '[data-src], [loading="lazy"], .lazy, .lazyload, .lazyloading'
-                    );
+                    // Check for various lazy loading patterns
+                    const lazySelectors = [
+                        '[data-src]', '[loading="lazy"]', '.lazy', '.lazyload', 
+                        '.lazyloading', '[data-lazy]', '[data-original]',
+                        '.lozad', '.lazy-loaded', '.lazy-loading'
+                    ];
                     
-                    for (const el of lazyElements) {
-                        if (el.classList.contains('lazyloading')) return false;
-                        if (el.hasAttribute('data-src') && !el.src) return false;
+                    for (const selector of lazySelectors) {
+                        const elements = document.querySelectorAll(selector);
+                        for (const el of elements) {
+                            // Check if still in loading state
+                            if (el.classList.contains('lazyloading') || 
+                                el.classList.contains('lazy-loading')) {
+                                return false;
+                            }
+                            
+                            // Check if data-src exists but src is missing
+                            if (el.hasAttribute('data-src') && !el.src && 
+                                el.getBoundingClientRect().top < window.innerHeight + 200) {
+                                return false;
+                            }
+                        }
                     }
                     
                     return true;
                 }
-            """, timeout=3000)
+            """, timeout=5000)
+            
+            # Wait for YouTube specific content
+            if 'youtube.com' in str(request.url) or 'youtu.be' in str(request.url):
+                await page.wait_for_function("""
+                    () => {
+                        // Wait for YouTube thumbnails specifically
+                        const thumbnails = document.querySelectorAll('img[src*="ytimg.com"], img[src*="ggpht.com"]');
+                        if (thumbnails.length === 0) return true;
+                        
+                        let loadedThumbnails = 0;
+                        thumbnails.forEach(thumb => {
+                            if (thumb.complete && thumb.naturalHeight > 0) {
+                                loadedThumbnails++;
+                            }
+                        });
+                        
+                        return loadedThumbnails / thumbnails.length >= 0.8;
+                    }
+                """, timeout=6000)
+            
+            logger.info("Enhanced final content check completed successfully")
             
         except Exception as e:
             # Non-critical failures
-            logger.info("Final content check timeout (non-critical)", error=str(e))
+            logger.info("Enhanced content check timeout (non-critical)", error=str(e))
     
     async def _take_screenshot_with_retry(self, page: Page, request: ScreenshotRequest, options: dict) -> bytes:
         """Take screenshot with retry logic"""
