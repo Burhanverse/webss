@@ -1,5 +1,20 @@
 # WebSS Release Notes
 
+## Version 1.0.5 - Modular Architecture & Enhanced Image Support
+*Released: August 5, 2025*
+
+### New Features
+- Complete modularization: Split main.py (970 lines) into focused modules
+- Enhanced image loading for YouTube thumbnails and The Verge website
+- New `block_images` parameter for maximum compatibility
+
+### Code Organization
+- Moved modules to `src/core/` directory
+- Improved maintainability with separation of concerns
+- Cleaned up project structure and removed unnecessary files
+
+---
+
 ## Version 1.0.4 - Heavy Site Support
 *Released: August 5, 2025*
 

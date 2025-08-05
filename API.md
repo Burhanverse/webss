@@ -166,7 +166,7 @@ When `output_format: "binary"` is used, the response is raw image data with appr
   "status": "healthy",
   "browser": "healthy",
   "timestamp": "2025-08-05T14:22:00.000Z",
-  "version": "1.0.3"
+  "version": "1.0.5"
 }
 ```
 
