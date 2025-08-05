@@ -1,5 +1,25 @@
 # WebSS Release Notes
 
+## Version 1.0.4 - Heavy Site Support
+*Released: August 5, 2025*
+
+### New Features
+- Smart waiting for heavy sites (YouTube, Facebook, Reddit)
+- 4 new API parameters: `smart_wait`, `wait_for_network_idle`, `aggressive_wait`, `extra_wait_time`
+- Framework detection for React/Angular/Vue
+- Progressive retry system with 6 strategies
+
+### Performance 
+- Better timeout handling and error recovery
+- Improved resource blocking
+
+### Other
+- Simplified README
+- Moved API docs to separate API.md file
+- Default delay increased to 8000ms
+
+---
+
 ## Version 1.0.3 - Advanced Navigation & Browser Detection Improvements
 *Released: August 5, 2025*
 
